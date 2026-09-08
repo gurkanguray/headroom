@@ -69,16 +69,11 @@ describe("registerHeadroomExtension", () => {
       start: vi.fn(),
       stop: vi.fn(),
     } as unknown as HeadroomRuntime;
-    const pendingRuntime = (
-      Promise as PromiseConstructor & {
-        withResolvers<T>(): {
-          promise: Promise<T>;
-          resolve: (value: T | PromiseLike<T>) => void;
-          reject: (reason?: unknown) => void;
-        };
-      }
-    ).withResolvers<HeadroomRuntime>();
-    const runtimeFactory: RuntimeFactory = () => pendingRuntime.promise;
+    let resolveRuntime!: (runtime: HeadroomRuntime) => void;
+    const pendingRuntime = new Promise<HeadroomRuntime>((resolve) => {
+      resolveRuntime = resolve;
+    });
+    const runtimeFactory: RuntimeFactory = () => pendingRuntime;
     registerHeadroomExtension(test.api, runtimeFactory);
     const ctx = context();
 
@@ -88,7 +83,7 @@ describe("registerHeadroomExtension", () => {
     test.handlers
       .get("session_shutdown")
       ?.({ type: "session_shutdown" }, ctx);
-    pendingRuntime.resolve(fakeRuntime);
+    resolveRuntime(fakeRuntime);
     await Promise.resolve(starting);
 
     expect(fakeRuntime.start).not.toHaveBeenCalled();
